@@ -1,0 +1,26 @@
+# runtime data
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/*.log
+data/*.csv
+data/backups/
+
+# build artefacts
+build/
+dist/
+.venv-build/
+.tools/
+*.spec.bak
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# verification screenshots
+verify/out/
+
+# local editor / OS
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
