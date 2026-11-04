@@ -4,11 +4,13 @@ from __future__ import annotations
 import datetime as dt
 import tkinter as tk
 
-from . import dates, money
+from . import dates, money, raster
 from .db import CategoryInUse, StoreError
 from .theme import CATEGORY_COLORS, font, px
-from .widgets import (ChipGroup, DateEntry, EntryField, FieldLabel, RoundButton,
-                      Segmented, confirm, draw_round_rect)
+from .views.common import amount_field
+from .widgets import (ChipGroup, DateEntry, EntryField, FieldLabel, LinkLabel,
+                      RoundButton, Segmented, confirm, draw_round_rect,
+                      round_window)
 
 
 class _Modal(tk.Toplevel):
@@ -30,6 +32,7 @@ class _Modal(tk.Toplevel):
         x = parent.winfo_rootx() + max(0, (parent.winfo_width() - self._width) // 2)
         y = parent.winfo_rooty() + max(0, (parent.winfo_height() - self._height) // 3)
         self.geometry("%dx%d+%d+%d" % (self._width, self._height, x, y))
+        round_window(self)
         shell = tk.Frame(self, bg=palette.surface)
         shell.pack(fill="both", expand=True, padx=1, pady=1)
         self.header = tk.Frame(shell, bg=palette.surface)
@@ -96,7 +99,7 @@ class TxDialog(_Modal):
     def __init__(self, parent, palette, store, tx=None, default_kind="expense",
                  default_date=None):
         title = "编辑记录" if tx else "记一笔"
-        super().__init__(parent, palette, title, 460, 520)
+        super().__init__(parent, palette, title, 460, 470)
         self.store = store
         self.tx = tx or {}
         self.kind = self.tx.get("kind") or default_kind
@@ -109,24 +112,10 @@ class TxDialog(_Modal):
         self.segmented.pack(anchor="w")
 
         _section_label(body, palette, "金额")
-        box = tk.Frame(body, bg=palette.surface, highlightthickness=1,
-                       highlightbackground=palette.border,
-                       highlightcolor=palette.accent)
-        box.pack(fill="x")
-        tk.Label(box, text="¥", bg=palette.surface, fg=palette.text_muted,
-                 font=font(16, "bold")).pack(side="left", padx=(px(12), px(2)))
         self.amount = tk.StringVar()
-        self.amount_entry = tk.Entry(box, textvariable=self.amount, bd=0,
-                                     bg=palette.surface, fg=palette.text,
-                                     insertbackground=palette.accent,
-                                     font=font(20, "bold"), highlightthickness=0,
-                                     relief="flat")
-        self.amount_entry.pack(side="left", fill="both", expand=True,
-                               padx=(0, px(12)), pady=px(8))
-        self.amount_entry.bind("<FocusIn>", lambda e: box.configure(
-            highlightbackground=palette.accent))
-        self.amount_entry.bind("<FocusOut>", lambda e: box.configure(
-            highlightbackground=palette.border))
+        box, self.amount_entry = amount_field(body, palette, self.amount,
+                                              size=20, height=58)
+        box.pack(fill="x")
         self.amount_entry.bind("<Return>", lambda e: self.save())
 
         _section_label(body, palette, "分类")
@@ -155,8 +144,8 @@ class TxDialog(_Modal):
         self.error.pack(fill="x", pady=(px(8), 0))
 
         if tx:
-            RoundButton(self.footer, palette, "删除", self._delete,
-                        variant="link", size=9).pack(side="left")
+            LinkLabel(self.footer, palette, "删除", command=self._delete,
+                      size=9).pack(side="left")
         RoundButton(self.footer, palette, "保存", self.save).pack(side="right")
         RoundButton(self.footer, palette, "取消", self.close,
                       variant="ghost").pack(side="right", padx=(0, px(10)))
@@ -258,10 +247,12 @@ class ColorPicker(tk.Frame):
             size = px(30)
             pad = px(4)
             if color == self.value:
-                cell.create_oval(0, 0, size + 2 * pad, size + 2 * pad,
-                                 outline=p.text, width=2)
-            cell.create_oval(pad, pad, size + pad, size + pad,
-                             fill=color, outline=color)
+                cell.create_image(
+                    0, 0, anchor="nw",
+                    image=raster.ring(cell, size + 2 * pad, 2, p.text,
+                                      None))
+            cell.create_image(pad, pad, anchor="nw",
+                              image=raster.circle(cell, size, color, None))
 
 
 class CategoryDialog(_Modal):
@@ -305,8 +296,8 @@ class CategoryDialog(_Modal):
         self.error.pack(fill="x", pady=(px(10), 0))
 
         if category:
-            RoundButton(self.footer, palette, "删除", self._delete,
-                        variant="link", size=9).pack(side="left")
+            LinkLabel(self.footer, palette, "删除", command=self._delete,
+                      size=9).pack(side="left")
         RoundButton(self.footer, palette, "保存", self.save).pack(side="right")
         RoundButton(self.footer, palette, "取消", self.close,
                       variant="ghost").pack(side="right", padx=(0, px(10)))
@@ -348,4 +339,3 @@ class CategoryDialog(_Modal):
             return
         self.result = "deleted"
         self.close()
-

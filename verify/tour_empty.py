@@ -25,6 +25,7 @@ def main():
         except OSError:
             pass
     app = App(db, demo=False)
+    app.animate_pages = False
     root = app.root
     settle(root)
     for index, name in enumerate(("record", "transactions", "stats", "settings")):

@@ -20,6 +20,7 @@ def settle(root, wait=0.2):
 def main():
     enable_dpi_awareness()
     app = App(os.path.join("data", "smoke.db"), demo=True)
+    app.animate_pages = False
     root = app.root
     settle(root)
     width, height = px(1000), px(640)

@@ -4,6 +4,7 @@ from __future__ import annotations
 import tkinter as tk
 
 from ..theme import font, px
+from ..widgets import draw_round_box
 
 
 def page_header(parent, palette, title, subtitle=""):
@@ -22,17 +23,43 @@ def divider(parent, color, pady=0, padx=0):
 
 
 def amount_field(master, palette, textvariable, size=20, height=58):
-    box = tk.Frame(master, bg=palette.surface, highlightthickness=1,
-                   highlightbackground=palette.border,
-                   highlightcolor=palette.accent)
+    outer = master.cget("bg")
+    box = tk.Frame(master, bg=outer, height=px(height))
+    box.pack_propagate(False)
+    canvas = tk.Canvas(box, bg=outer, bd=0, highlightthickness=0)
+    canvas.place(x=0, y=0, relwidth=1, relheight=1)
+    state = {"focus": False}
+
+    def redraw(_event=None):
+        width = box.winfo_width()
+        actual = box.winfo_height()
+        if width <= 1 or actual <= 1:
+            return
+        border = palette.accent if state["focus"] else palette.border
+        draw_round_box(canvas, 0, 0, width, actual, px(10),
+                       palette.surface, border, outer)
+
     tk.Label(box, text="¥", bg=palette.surface, fg=palette.text_muted,
-             font=font(size - 3, "bold")).pack(side="left", padx=(px(14), px(2)))
+             font=font(size - 3, "bold")).pack(side="left",
+                                              padx=(px(16), px(2)))
     entry = tk.Entry(box, textvariable=textvariable, bd=0, bg=palette.surface,
                      fg=palette.text, insertbackground=palette.accent,
                      font=font(size, "bold"), highlightthickness=0, relief="flat")
-    entry.pack(side="left", fill="both", expand=True, padx=(0, px(14)), pady=px(8))
-    entry.bind("<FocusIn>", lambda e: box.configure(highlightbackground=palette.accent))
-    entry.bind("<FocusOut>", lambda e: box.configure(highlightbackground=palette.border))
+    entry.pack(side="left", fill="both", expand=True, padx=(0, px(16)),
+               pady=px(10))
+
+    def focus_in(_event):
+        state["focus"] = True
+        redraw()
+
+    def focus_out(_event):
+        state["focus"] = False
+        redraw()
+
+    entry.bind("<FocusIn>", focus_in)
+    entry.bind("<FocusOut>", focus_out)
+    box.bind("<Configure>", redraw)
+    box.after_idle(redraw)
     return box, entry
 
 

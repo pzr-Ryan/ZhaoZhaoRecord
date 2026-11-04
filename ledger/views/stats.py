@@ -19,6 +19,8 @@ class StatsView(tk.Frame):
         self.palette = app.palette
         super().__init__(master, bg=self.palette.bg)
         self.period = "days"
+        self._bar_sig = None
+        self._donut_sig = None
         self._build()
         self.refresh()
 
@@ -163,10 +165,20 @@ class StatsView(tk.Frame):
             values = self.store.yearly_expense()
             data = [("%d年" % year, values.get(year, 0))
                     for year in range(today.year - 4, today.year + 1)]
+        signature = (self.period, tuple(data))
+        if signature == self._bar_sig and self.bar._drawn:
+            return
+        self._bar_sig = signature
         self.bar.set_data(data, highlight=len(data) - 1)
 
     def _load_donut(self, start, end):
         items = self.store.category_breakdown(start, end, kind="expense")
+        signature = tuple((item.get("name"), item.get("color"),
+                           int(item.get("cents", 0)), int(item.get("count", 0)))
+                          for item in items)
+        if signature == self._donut_sig and self.donut._drawn:
+            return
+        self._donut_sig = signature
         self.donut.set_data(items, center_label="本月支出")
 
     def _load_overview(self, today, start, end, summary):

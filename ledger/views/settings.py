@@ -7,10 +7,11 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import colorchooser, filedialog
 
+from .. import raster
 from ..db import CategoryInUse, ValidationError
 from ..theme import CATEGORY_COLORS, PRESETS, font, px
-from ..widgets import (RoundButton, RoundedCard, ScrollFrame, SectionHeader,
-                       Segmented, confirm)
+from ..widgets import (LinkLabel, RoundButton, RoundedCard, ScrollFrame,
+                       SectionHeader, Segmented, confirm)
 from .common import page_header
 
 APP_VERSION = "1.0.0"
@@ -37,18 +38,20 @@ class _Swatch(tk.Frame):
     def _draw(self):
         self.canvas.delete("all")
         size = px(44)
-        center = size / 2.0
-        radius = size / 2.0 - px(5)
+        p = self.palette
         if self.selected:
-            self.canvas.create_oval(center - radius, center - radius,
-                                    center + radius, center + radius,
-                                    outline=self.accent, width=px(2))
-            radius -= px(4)
-        self.canvas.create_oval(center - radius, center - radius,
-                                center + radius, center + radius,
-                                fill=self.accent, outline="")
-        self.label.configure(fg=self.palette.text if self.selected
-                             else self.palette.text_muted,
+            ring_size = size - px(6)
+            ring_offset = (size - ring_size) // 2
+            self.canvas.create_image(
+                ring_offset, ring_offset, anchor="nw",
+                image=raster.ring(self.canvas, ring_size, px(2),
+                                  self.accent, None))
+        dot = size - px(14)
+        offset = (size - dot) // 2
+        self.canvas.create_image(
+            offset, offset, anchor="nw",
+            image=raster.circle(self.canvas, dot, self.accent, None))
+        self.label.configure(fg=p.text if self.selected else p.text_muted,
                              font=font(9, "bold" if self.selected else "normal"))
 
 
@@ -60,6 +63,7 @@ class SettingsView(tk.Frame):
         super().__init__(master, bg=self.palette.bg)
         self.kind = "expense"
         self.swatches = []
+        self._cat_signature = None
         self._build()
         self.refresh()
 
@@ -168,9 +172,15 @@ class SettingsView(tk.Frame):
 
     def _load_categories(self):
         p = self.palette
+        cats = self.store.list_categories(self.kind)
+        usage = {cat["id"]: self.store.category_usage(cat["id"]) for cat in cats}
+        signature = tuple((cat["id"], cat["name"], cat["color"], cat["kind"],
+                           usage[cat["id"]]) for cat in cats)
+        if signature == self._cat_signature and self.cat_list.winfo_children():
+            return
+        self._cat_signature = signature
         for child in self.cat_list.winfo_children():
             child.destroy()
-        cats = self.store.list_categories(self.kind)
         for index, cat in enumerate(cats):
             if index:
                 tk.Frame(self.cat_list, bg=p.border, height=1).pack(fill="x")
@@ -179,17 +189,19 @@ class SettingsView(tk.Frame):
             dot = tk.Canvas(row, width=px(11), height=px(11), bg=p.surface,
                             bd=0, highlightthickness=0)
             dot.pack(side="left", padx=(px(2), px(10)))
-            dot.create_oval(1, 1, px(10), px(10), fill=cat["color"], outline="")
+            dot.create_image(0, 0, anchor="nw",
+                             image=raster.circle(dot, px(10), cat["color"], None))
             tk.Label(row, text=cat["name"], bg=p.surface, fg=p.text,
                      font=font(10), anchor="w").pack(side="left")
-            usage = self.store.category_usage(cat["id"])
-            tk.Label(row, text="%d 笔" % usage, bg=p.surface, fg=p.text_muted,
-                     font=font(8)).pack(side="left", padx=(px(10), 0))
-            RoundButton(row, p, "删除", lambda c=cat: self._delete_category(c),
-                        variant="link", height=26, size=9).pack(side="right")
-            RoundButton(row, p, "编辑", lambda c=cat: self._edit_category(c),
-                        variant="link", height=26, size=9).pack(side="right",
-                                                              padx=(0, px(4)))
+            tk.Label(row, text="%d 笔" % usage[cat["id"]], bg=p.surface,
+                     fg=p.text_muted, font=font(8)).pack(side="left",
+                                                        padx=(px(10), 0))
+            LinkLabel(row, p, "删除",
+                      command=lambda c=cat: self._delete_category(c),
+                      size=9).pack(side="right")
+            LinkLabel(row, p, "编辑",
+                      command=lambda c=cat: self._edit_category(c),
+                      size=9).pack(side="right", padx=(0, px(16)))
 
     def _add_category(self):
         from ..dialogs import CategoryDialog

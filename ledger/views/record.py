@@ -4,7 +4,7 @@ from __future__ import annotations
 import datetime as dt
 import tkinter as tk
 
-from .. import dates, money
+from .. import dates, money, raster
 from ..theme import font, px
 from ..widgets import (ChipGroup, DateEntry, EmptyState, EntryField, FieldLabel,
                        RoundButton, RoundedCard, ScrollFrame, SectionHeader,
@@ -20,6 +20,8 @@ class RecordView(tk.Frame):
         super().__init__(master, bg=self.palette.bg)
         self.kind = "expense"
         self._rows = []
+        self._category_signature = None
+        self._today_signature = None
         self._build()
         self.refresh()
 
@@ -109,7 +111,10 @@ class RecordView(tk.Frame):
         options = [{"value": c["id"], "label": c["name"], "color": c["color"]}
                    for c in self.categories]
         previous = preferred if preferred is not None else self.chips.get()
-        self.chips.set_options(options)
+        signature = tuple((c["id"], c["name"], c["color"]) for c in self.categories)
+        if signature != self._category_signature:
+            self._category_signature = signature
+            self.chips.set_options(options)
         values = [c["id"] for c in self.categories]
         if previous not in values:
             previous = values[0] if values else None
@@ -127,6 +132,8 @@ class RecordView(tk.Frame):
 
     def on_show(self):
         self.refresh()
+
+    def on_reveal(self):
         try:
             self.amount_entry.focus_set()
         except tk.TclError:
@@ -135,15 +142,22 @@ class RecordView(tk.Frame):
     def _refresh_today(self):
         p = self.palette
         body = self.today_scroll.body
-        for child in body.winfo_children():
-            child.destroy()
-        self._rows = []
         today = dates.iso(dt.date.today())
         summary = self.store.summary(today, today)
         self.today_total.configure(
             text="支出 %s · 收入 %s" % (money.format_cents(summary["expense_cents"]),
                                         money.format_cents(summary["income_cents"])))
         rows = self.store.list_tx(today, today, order="date_desc")
+        signature = (summary["expense_cents"], summary["income_cents"],
+                     tuple((tx["id"], tx["category_name"], tx.get("note"),
+                            tx["amount_cents"], tx["kind"], tx["date"],
+                            tx["category_color"]) for tx in rows))
+        if signature == self._today_signature:
+            return
+        self._today_signature = signature
+        for child in body.winfo_children():
+            child.destroy()
+        self._rows = []
         if not rows:
             EmptyState(body, p, "今天还没有记账", "在上方表单记下第一笔吧").pack(
                 pady=(px(28), 0))
@@ -152,7 +166,6 @@ class RecordView(tk.Frame):
                 self._add_row(body, tx)
                 if index < len(rows) - 1:
                     tk.Frame(body, bg=p.border, height=1).pack(fill="x", padx=px(2))
-        self.today_scroll.bind_tree()
 
     def _add_row(self, body, tx):
         p = self.palette
@@ -163,8 +176,9 @@ class RecordView(tk.Frame):
         dot = tk.Canvas(inner, width=px(10), height=px(10), bg=p.surface, bd=0,
                         highlightthickness=0)
         dot.pack(side="left", padx=(px(2), px(10)))
-        dot.create_oval(0, 0, px(9), px(9), fill=tx["category_color"],
-                        outline=tx["category_color"])
+        dot.create_image(0, 0, anchor="nw",
+                         image=raster.circle(dot, px(10), tx["category_color"],
+                                             None))
         text = tk.Frame(inner, bg=p.surface)
         text.pack(side="left", fill="x", expand=True)
         title = tx["category_name"]

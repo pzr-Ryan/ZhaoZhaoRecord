@@ -115,6 +115,9 @@ powershell -ExecutionPolicy Bypass -File packaging\build.ps1 -SkipInstall -Sign 
     theme.py              配色、DPI 缩放、ttk 样式
     widgets.py            自绘卡片/按钮/标签/下拉/日历/滚动区/Toast 等
     charts.py             柱状图与环形图（Canvas 自绘）
+    raster.py             无 Pillow 的抗锯齿图形渲染与缓存
+    motion.py             缓动曲线与转场时长常量
+    snapshot.py           Windows GDI 页面截图（切页转场用）
     dialogs.py            记账、分类对话框
     demo.py               演示数据生成
     views/                记账 / 明细 / 统计 / 设置 四个页面
@@ -123,6 +126,34 @@ powershell -ExecutionPolicy Bypass -File packaging\build.ps1 -SkipInstall -Sign 
   docs/screenshots/       README 界面截图
   verify/                 截图与端到端验证脚本
 ```
+
+## 更新与修复
+
+### 1.1.0（开发中）
+
+**新增**
+
+- **页面切换转场**：切页时先截取当前页，用无边框窗口把它从 1.0 线性淡出到 0（1000ms）；淡出到 75% 时新页从下方滑入，总时长 2150ms。截图失败或非 Windows 平台自动回退纯色幕布（`ledger/motion.py`、`ledger/snapshot.py`）。
+- **自绘控件体系**：`NavItem` 左栏导航（图标 + 悬停态）、圆角卡片与统计卡、圆角窗口、自定义下拉框与日期选择器（含日历弹层）、圆角输入框与金额框、胶囊分段器、链接式按钮 `LinkLabel`（`ledger/widgets.py`）。
+- **无 Pillow 的抗锯齿绘制**：新增 `ledger/raster.py`，圆角矩形 / 圆环 / 圆形以上采样 + 盒式滤波生成 PNG，经 `tk.PhotoImage` 显示，并按尺寸和颜色缓存；图表与图标在高 DPI、任意窗口尺寸下都保持平滑。
+- **图表视觉升级**：柱状图改为渐变圆角柱并带数值气泡，环形图增加缎带与高光，悬浮提示同步重绘。
+- **代码签名流水线**：`packaging\build.ps1` 新增 `-Sign`、`-PfxPath`、`-PfxPassword`、`-CertThumbprint`、`-TimestampUrl`（默认 DigiCert RFC3161 时间戳），签名在压缩 zip 之前完成，`SHA256SUMS.txt` 随签名后的产物重算；新增 `packaging\sign.ps1`（优先 signtool，找不到时回退 `Set-AuthenticodeSignature`；PFX 用 `EphemeralKeySet` 内存加载，不写入证书存储）。`.gitignore` 忽略 `*.pfx` / `*.p12` / `*.snk`。
+- **文档**：新增 [docs/signing.md](docs/signing.md)，说明 SmartScreen 成因、自签名 / OV / EV / Azure / SignPath 方案对比、CI 接法与签名校验命令。
+
+**修复与优化**
+
+- **切页卡顿**：图表重绘加 70ms / 80ms 防抖，页面隐藏（`<Unmap>`）时取消待执行的重绘，避免上一页的绘制任务落到新页面上。
+- **统计页重复绘制**：按数据签名比较，数据没变就跳过柱状图与环形图的重绘（首次切页从约 600ms 降到 150ms 内）。
+- **记账页重复重建**：分类胶囊与今日清单按签名比较，只有数据变化时才重建控件。
+- **输入框聚焦态**：改为 Canvas 圆角描边，聚焦时描边转主题色，替代原先依赖 `Frame highlight` 的直角边框。
+- **主题细节**：`surface_alt` → `#F8FAFC`、`border` → `#E7EAF0`、`text` → `#111827`；明细行高 38 → 40px，图表网格线微调。
+- **文档**：常见问题新增“双击 exe 一闪而过、提示 `Could not create temporary directory!`”的排查说明（从受限目录启动会被降为低完整性级别，需把 exe 放到普通目录）。
+
+### 1.0.0（2026-11-03 首次发布）
+
+- 四个页面：记账、明细、统计、设置；SQLite 本地存储（`%LOCALAPPDATA%\ZhaoZhaoRecord\data\ledger.db`）。
+- 分类管理、CSV 导出 / 导入、备份与恢复、蓝白浅色主题。
+- 单文件 exe（onefile、无控制台窗口、内嵌图标与版本信息）与 `启动记账.bat` / `启动记账.vbs` 启动脚本。
 
 ## 常见问题
 

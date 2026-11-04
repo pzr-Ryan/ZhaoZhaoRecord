@@ -31,6 +31,7 @@ def main():
     db = os.path.join("data", "flow.db")
     clean(db)
     app = App(db, demo=False)
+    app.animate_pages = False
     root = app.root
     settle(root)
     store = app.store

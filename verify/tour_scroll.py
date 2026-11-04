@@ -11,6 +11,7 @@ def main():
     enable_dpi_awareness()
     db = os.path.join("data", "smoke.db")
     app = App(db, demo=True)
+    app.animate_pages = False
     root = app.root
     settle(root)
     os.makedirs("verify/out", exist_ok=True)

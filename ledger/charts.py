@@ -5,9 +5,10 @@ import math
 import tkinter as tk
 import tkinter.font as tkfont
 
+from . import raster
 from .money import format_cents, format_compact
+from .motion import Debouncer
 from .theme import FONT_FAMILY, font, mix, px
-from .widgets import draw_round_rect
 
 
 def nice_max(value):
@@ -39,7 +40,11 @@ class BarChart(tk.Canvas):
         self._font_label = tkfont.Font(family=FONT_FAMILY, size=9)
         self._font_value = tkfont.Font(family=FONT_FAMILY, size=9, weight="bold")
         self._font_tip = tkfont.Font(family=FONT_FAMILY, size=9)
-        self.bind("<Configure>", lambda e: self._draw())
+        self._last_size = (0, 0)
+        self._drawn = False
+        self._resize = Debouncer(self, 70, self._draw)
+        self.bind("<Configure>", self._on_configure)
+        self.bind("<Unmap>", self._on_unmap)
         self.bind("<Motion>", self._on_motion)
         self.bind("<Leave>", self._on_leave)
 
@@ -48,6 +53,18 @@ class BarChart(tk.Canvas):
         self._highlight = highlight
         self._hover = None
         self._draw()
+
+    def _on_configure(self, event=None):
+        size = (self.winfo_width(), self.winfo_height())
+        if size == self._last_size:
+            return
+        self._last_size = size
+        self._resize.schedule()
+
+    def _on_unmap(self, _event=None):
+        # A page switch can hide the chart before its debounced redraw runs;
+        # cancel it so the expensive paint never lands on the next page.
+        self._resize.cancel()
 
     def _on_motion(self, event):
         index = None
@@ -66,6 +83,7 @@ class BarChart(tk.Canvas):
 
     def _draw(self):
         self.delete("all")
+        self._drawn = True
         self._slots = []
         width = self.winfo_width()
         height = self.winfo_height()
@@ -124,8 +142,11 @@ class BarChart(tk.Canvas):
             else:
                 fill = mix(self.bar_color, p.surface, 0.32)
             if cents > 0:
-                draw_round_rect(self, left, top, right, baseline,
-                                max(1, min(px(6), bar_w / 2)), fill=fill, outline="")
+                bar_h = max(1, int(round(baseline - top)))
+                radius = max(1, int(round(min(px(6), bar_w / 2))))
+                image = raster.bar_rgba(self, int(round(bar_w)), bar_h, radius,
+                                        fill, mix(fill, p.surface, 0.16))
+                self.create_image(left, top, anchor="nw", image=image)
             else:
                 self.create_line(left, baseline - 1, right, baseline - 1,
                                  fill=p.border, width=px(2))
@@ -145,8 +166,9 @@ class BarChart(tk.Canvas):
         x = center - tip_w / 2
         x = max(px(4), min(x, width - tip_w - px(4)))
         y = pad_top - px(4)
-        draw_round_rect(self, x, y, x + tip_w, y + tip_h, px(7),
-                        fill=p.text, outline="")
+        image = raster.round_rect(self, tip_w, tip_h, px(7), p.text, p.text,
+                                  p.surface)
+        self.create_image(x, y, anchor="nw", image=image)
         self.create_text(x + tip_w / 2, y + tip_h / 2, text=text,
                          fill="#FFFFFF", font=self._font_tip)
 
@@ -165,15 +187,30 @@ class DonutChart(tk.Canvas):
         self._font_center_label = tkfont.Font(family=FONT_FAMILY, size=9)
         self._font_name = tkfont.Font(family=FONT_FAMILY, size=9)
         self._font_amount = tkfont.Font(family=FONT_FAMILY, size=9, weight="bold")
-        self.bind("<Configure>", lambda e: self._draw())
+        self._last_size = (0, 0)
+        self._drawn = False
+        self._resize = Debouncer(self, 80, self._draw)
+        self.bind("<Configure>", self._on_configure)
+        self.bind("<Unmap>", self._on_unmap)
 
     def set_data(self, items, center_label="合计"):
         self._items = [dict(item) for item in items]
         self.center_label = center_label
         self._draw()
 
+    def _on_configure(self, event=None):
+        size = (self.winfo_width(), self.winfo_height())
+        if size == self._last_size:
+            return
+        self._last_size = size
+        self._resize.schedule()
+
+    def _on_unmap(self, _event=None):
+        self._resize.cancel()
+
     def _draw(self):
         self.delete("all")
+        self._drawn = True
         width = self.winfo_width()
         height = self.winfo_height()
         if width <= 1:
@@ -196,11 +233,11 @@ class DonutChart(tk.Canvas):
         x0 = max(pad, (width - group_w) / 2)
         y0 = (height - diameter) / 2
         cx, cy = x0 + diameter / 2, y0 + diameter / 2
-        radius = (diameter - ring) / 2
-        box = (cx - radius, cy - radius, cx + radius, cy + radius)
         legend_x = x0 + diameter + px(36)
         if total <= 0:
-            self.create_oval(*box, outline=p.border, width=ring)
+            image = raster.donut(self, diameter, ring,
+                                 [(0.0, 360.0, p.border)])
+            self.create_image(x0, y0, anchor="nw", image=image)
             self.create_text(cx, cy - px(8), text=format_cents(0),
                              fill=p.text, font=self._font_center)
             self.create_text(cx, cy + px(16), text=self.center_label,
@@ -210,20 +247,18 @@ class DonutChart(tk.Canvas):
                                  anchor="w", fill=p.text_muted,
                                  font=self._font_name)
             return
-        self.create_oval(*box, outline=p.surface_alt, width=ring)
-        start = 90.0
+        segments = []
+        angle = 0.0
         for item in self._items:
             cents = max(0, int(item.get("cents", 0)))
             if cents <= 0:
                 continue
-            extent = -360.0 * cents / total
+            extent = 360.0 * cents / total
             color = item.get("color") or p.accent
-            if extent <= -359.5:
-                self.create_oval(*box, outline=color, width=ring)
-            else:
-                self.create_arc(*box, start=start, extent=extent, style="arc",
-                                outline=color, width=ring)
-            start += extent
+            segments.append((angle, extent, color))
+            angle += extent
+        image = raster.donut(self, diameter, ring, segments)
+        self.create_image(x0, y0, anchor="nw", image=image)
         self.create_text(cx, cy - px(8), text=format_cents(total),
                          fill=p.text, font=self._font_center)
         self.create_text(cx, cy + px(16), text=self.center_label,
@@ -239,8 +274,8 @@ class DonutChart(tk.Canvas):
             color = item.get("color") or p.accent
             name = str(item.get("name", ""))
             dot = px(4)
-            self.create_oval(legend_x, y + row_h / 2 - dot, legend_x + 2 * dot,
-                             y + row_h / 2 + dot, fill=color, outline=color)
+            self.create_image(legend_x, y + row_h / 2.0, anchor="w",
+                              image=raster.circle(self, dot * 2, color, p.surface))
             percent = cents * 100.0 / total
             percent_text = ("%.1f%%" if percent < 10 else "%.0f%%") % percent
             self.create_text(legend_x + px(18), y + row_h / 2, text=name,

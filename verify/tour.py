@@ -21,6 +21,7 @@ def main():
             except OSError:
                 pass
     app = App(db, demo=True)
+    app.animate_pages = False
     root = app.root
     root.update_idletasks()
     root.update()

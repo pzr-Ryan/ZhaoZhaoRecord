@@ -95,14 +95,14 @@ def build_palette(name, accent):
         accent_soft=soft,
         bg="#F5F7FB",
         surface="#FFFFFF",
-        surface_alt="#FAFBFE",
-        border="#E6EAF2",
-        text="#1F2937",
+        surface_alt="#F8FAFC",
+        border="#E7EAF0",
+        text="#111827",
         text_muted="#6B7280",
         text_on_accent=on_accent,
         danger="#DC2626",
         success="#16A34A",
-        chart_grid="#EDF1F7",
+        chart_grid="#EEF1F6",
     )
 
 
@@ -148,7 +148,7 @@ def apply_ttk(root, palette):
         background=palette.surface,
         fieldbackground=palette.surface,
         foreground=palette.text,
-        rowheight=px(38),
+        rowheight=px(40),
         borderwidth=0,
         relief="flat",
         font=font(11),

@@ -8,7 +8,8 @@ from tkinter import ttk
 from .. import dates, money
 from ..theme import font, px
 from ..widgets import (DateEntry, Dropdown, EmptyState, EntryField, FieldLabel,
-                       RoundButton, RoundedCard, SectionHeader, Segmented, confirm)
+                       LinkLabel, RoundButton, RoundedCard, SectionHeader,
+                       Segmented, confirm)
 from .common import page_header, truncate
 
 
@@ -54,8 +55,8 @@ class TransactionsView(tk.Frame):
         self.range_seg = Segmented(top, p, RANGES, value=self.range_value,
                                    command=self._on_range)
         self.range_seg.pack(side="left")
-        RoundButton(top, p, "重置筛选", self._reset, variant="link", height=30,
-                    size=9).pack(side="right")
+        LinkLabel(top, p, "重置筛选", command=self._reset,
+                  size=9).pack(side="right")
 
         controls = tk.Frame(body, bg=p.surface)
         controls.pack(fill="x", pady=(px(14), 0))
