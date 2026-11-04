@@ -6,6 +6,11 @@ data/*.log
 data/*.csv
 data/backups/
 
+# code signing material (never commit)
+*.pfx
+*.p12
+*.snk
+
 # build artefacts
 build/
 dist/

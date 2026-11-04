@@ -9,7 +9,7 @@
 - **直接使用（推荐）**：从 [GitHub Releases](https://github.com/pzr-Ryan/ZhaoZhaoRecord/releases) 下载 `ZhaoZhaoRecord.exe`，双击运行，无需安装 Python。
 - 也可以下载 `ZhaoZhaoRecord-1.0.0-win64.zip`，解压后运行其中的 exe。
 - 首次运行会自动创建数据库和默认分类，位置为 `%LOCALAPPDATA%\ZhaoZhaoRecord\data\ledger.db`。
-- 程序没有代码签名，若 Windows SmartScreen 提示“已保护你的电脑”，点“更多信息 → 仍要运行”即可。
+- **提示“Windows 已保护你的电脑”**：exe 目前未做代码签名，从网络下载后首次运行会触发 SmartScreen。点“更多信息 → 仍要运行”即可；想让本机以后不再提示，右键 exe → 属性 → 勾选“解除锁定”。彻底消除提示需要受信任的代码签名证书，选型与内置签名脚本见 [docs/signing.md](docs/signing.md)。
 - 便携用法：`ZhaoZhaoRecord.exe --db D:\我的账本\ledger.db`，可把数据库放到任意目录。
 
 ### 从源码运行
@@ -91,6 +91,14 @@ powershell -ExecutionPolicy Bypass -File packaging\build.ps1
 
 - `dist\ZhaoZhaoRecord.exe`：onefile、无控制台窗口，内嵌图标与版本信息 1.0.0；
 - `dist\SHA256SUMS.txt`：发布附件的 SHA-256 校验值。
+
+需要签名的发布版，先取得代码签名证书，再用 `-Sign` 让构建在压缩前完成 Authenticode 签名（SHA-256 + RFC 3161 时间戳）：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File packaging\build.ps1 -SkipInstall -Sign -PfxPath C:\keys\zhao.pfx
+```
+
+也可用 `-CertThumbprint` 指定当前用户证书存储中的证书；签名细节见 [docs/signing.md](docs/signing.md)。
 
 图标可用 `packaging\make_icon.ps1` 重新生成；版本资源在 `packaging\version_info.txt`，PyInstaller 配置在 `packaging\ZhaoZhaoRecord.spec`。
 

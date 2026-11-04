@@ -1,10 +1,19 @@
 param(
-    [switch]$SkipInstall
+    [switch]$SkipInstall,
+    [switch]$Sign,
+    [string]$PfxPath,
+    [string]$PfxPassword,
+    [string]$CertThumbprint,
+    [string]$TimestampUrl = "http://timestamp.digicert.com"
 )
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
+
+if ($Sign -and -not $PfxPath -and -not $CertThumbprint) {
+    throw "Signing requested but no certificate given: use -PfxPath (optionally -PfxPassword) or -CertThumbprint."
+}
 
 $tools = Join-Path $root ".tools\pyinstaller"
 $pyiPackage = Join-Path $tools "PyInstaller"
@@ -21,6 +30,12 @@ if ($LASTEXITCODE -ne 0) { throw "PyInstaller build failed" }
 
 $exe = Join-Path $root "dist\ZhaoZhaoRecord.exe"
 if (-not (Test-Path $exe)) { throw "Missing build output: $exe" }
+
+if ($Sign) {
+    Write-Output "Signing ZhaoZhaoRecord.exe ..."
+    & (Join-Path $PSScriptRoot "sign.ps1") -Path $exe -PfxPath $PfxPath -PfxPassword $PfxPassword -CertThumbprint $CertThumbprint -TimestampUrl $TimestampUrl
+    if ($LASTEXITCODE -ne 0) { throw "Code signing failed" }
+}
 
 $zip = Join-Path $root "dist\ZhaoZhaoRecord-1.0.0-win64.zip"
 Compress-Archive -Path $exe -DestinationPath $zip -Force
