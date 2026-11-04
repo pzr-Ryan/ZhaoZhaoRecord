@@ -127,6 +127,7 @@ powershell -ExecutionPolicy Bypass -File packaging\build.ps1 -SkipInstall -Sign 
 ## 常见问题
 
 - **双击 VBS 没反应**：确认 `pythonw.exe` 在 PATH 中（命令行执行 `where pythonw`）。可改用 `启动记账.bat` 查看错误。
+- **双击 exe 一闪而过、提示 `Could not create temporary directory!`**：onefile 版 exe 启动时要先把运行时解压到 `%TEMP%`。若 exe 放在被沙箱或权限策略限制的目录（进程会被降为低完整性级别 Low IL，写不进 `%TEMP%`），程序会在窗口出现前退出。把 exe 复制到普通目录（如 `D:\Apps\ZhaoZhaoRecord\`）再运行即可；用 `--db` 指定数据库路径不受影响。
 - **界面模糊 / 截图错位**：程序启动时会声明 DPI 感知；若切换过缩放或使用远程桌面，重启应用即可。
 - **数据库被占用**：确认没有同时运行多个窗口；WAL 模式下异常退出一般可自动恢复。
 - **想清空重来**：退出应用后删除数据库文件（源码为 `data\ledger.db`，exe 为 `%LOCALAPPDATA%\ZhaoZhaoRecord\data\ledger.db`）及 `-wal`/`-shm` 文件，再次启动会重新建库和默认分类。
